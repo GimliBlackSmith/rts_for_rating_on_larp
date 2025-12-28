@@ -1,6 +1,18 @@
 version: "3.9"
 
 services:
+  certs:
+    image: alpine:3.20
+    container_name: rts-certs
+    volumes:
+      - ./nginx/certs:/certs
+    command:
+      [
+        "sh",
+        "-c",
+        "apk add --no-cache openssl >/dev/null && if [ ! -f /certs/server.crt ] || [ ! -f /certs/server.key ]; then openssl req -x509 -nodes -newkey rsa:2048 -days 365 -subj \"/CN=localhost\" -keyout /certs/server.key -out /certs/server.crt; fi",
+      ]
+
   app:
     build:
       context: .
@@ -22,6 +34,8 @@ services:
     ports:
       - "8080:8080"
     depends_on:
+      certs:
+        condition: service_completed_successfully
       pgpool:
         condition: service_healthy
       redis:
@@ -109,6 +123,8 @@ services:
     image: nginx:1.27
     container_name: rts-nginx
     depends_on:
+      certs:
+        condition: service_completed_successfully
       - app
     ports:
       - "8443:443"

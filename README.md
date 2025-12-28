@@ -39,8 +39,8 @@ includes TLS termination for webhook testing and a streaming replica for Postgre
 
 ### TLS for webhook testing
 
-The stack ships with a self-signed certificate in `nginx/certs`. Replace it with a real
-certificate before exposing the stack publicly.
+The stack generates a dummy self-signed certificate on startup in `nginx/certs`. Replace it
+with a real certificate before exposing the stack publicly.
 
 ### Configuration storage
 
@@ -75,7 +75,7 @@ Grafana is available for dashboards.
      - `SERVER_ADDR` (default `:8080`)
 
 2. **Provision TLS certificate**
-   - For local testing, the repo ships with a self-signed cert at `nginx/certs`.
+   - For local testing, the stack generates a self-signed cert in `nginx/certs`.
    - For real deployments, replace `nginx/certs/server.crt` and `nginx/certs/server.key`
      with a valid certificate for your domain.
 
