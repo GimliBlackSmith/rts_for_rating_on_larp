@@ -23,8 +23,8 @@ ps: ## Show service status
 sh: ## Open a shell in the application container
 	$(COMPOSE) exec app /bin/bash
 
-psql: ## Open a psql session inside the Postgres container
-	$(COMPOSE) exec postgres psql -U rts_user -d rts_db
+psql: ## Open a psql session inside the Postgres primary container
+	$(COMPOSE) exec postgres-primary psql -U rts_user -d rts_db
 
 redis-cli: ## Open a redis-cli session
 	$(COMPOSE) exec redis redis-cli

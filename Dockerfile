@@ -1,18 +1,33 @@
-# syntax=docker/dockerfile:1
+ARG GO_VERSION=1.25.4
 
-FROM golang:1.22 AS development
+FROM golang:${GO_VERSION}-alpine AS builder
 
 WORKDIR /app
 
-ENV PATH="/go/bin:${PATH}" \
-    CGO_ENABLED=0 \
-    GO111MODULE=on
+COPY go.mod ./
+RUN go mod download && go mod verify && go mod tidy
 
-RUN go install github.com/cosmtrek/air@v1.52.0 \
-    && go install github.com/motemen/gore@latest
+RUN GOFLAGS='-buildvcs=false' go build -o bot ./cmd/
+RUN chmod +x .
 
 COPY . .
 
-RUN if [ -f go.mod ]; then go mod download; fi
+ENV GOPATH=/go
 
-CMD ["air", "-c", ".air.toml"]
+RUN go install github.com/x-motemen/gore/cmd/gore@latest && \
+    go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.6.2
+
+RUN apk add --no-cache ca-certificates tzdata && update-ca-certificates
+
+RUN addgroup -g 1000 appuser && adduser -D -u 1000 -G appuser appuser
+
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+
+USER appuser
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+
+EXPOSE 8080
+
+CMD ["./bot"]
