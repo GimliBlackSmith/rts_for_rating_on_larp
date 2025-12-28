@@ -1,0 +1,12 @@
+DROP TABLE IF EXISTS system_rating_limits;
+DROP TABLE IF EXISTS system_config;
+DROP TABLE IF EXISTS admin_actions;
+DROP TABLE IF EXISTS operations_log;
+DROP TABLE IF EXISTS player_level_history;
+DROP TABLE IF EXISTS level_boundaries;
+DROP TABLE IF EXISTS rating_transfers;
+DROP TABLE IF EXISTS player_ratings;
+DROP TABLE IF EXISTS cycle_rating_limits;
+DROP TABLE IF EXISTS game_cycles;
+DROP TABLE IF EXISTS player_links;
+DROP TABLE IF EXISTS players;
