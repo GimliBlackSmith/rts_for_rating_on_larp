@@ -16,27 +16,27 @@ services:
   app:
     build:
       context: .
-      target: development
+      target: runtime
     container_name: rts-app
-    command: ["air", "-c", ".air.toml"]
+    restart: unless-stopped
     volumes:
-      - .:/app
-      - go-mod-cache:/go/pkg/mod
-      - go-build-cache:/root/.cache/go-build
+      - ./nginx/certs:/etc/nginx/certs:ro
     environment:
-      GO_ENV: development
-      DATABASE_URL: postgres://rts_user:rts_password@pgpool:5432/rts_db?sslmode=disable
+      GO_ENV: production
+      DATABASE_URL: postgres://rts_user:rts_password@postgres-primary:5432/rts_db?sslmode=disable
       REDIS_URL: redis://redis:6379/0
       WEBHOOK_URL: https://localhost:8443
       TELEGRAM_TOKEN: ${TELEGRAM_TOKEN:-}
-      WEBHOOK_CERT: /app/nginx/certs/server.crt
+      WEBHOOK_CERT: /etc/nginx/certs/server.crt
       ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+    mem_limit: 256m
+    cpus: 0.50
     ports:
       - "8080:8080"
     depends_on:
       certs:
         condition: service_completed_successfully
-      pgpool:
+      postgres-primary:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -55,6 +55,9 @@ services:
       - "5432:5432"
     volumes:
       - postgres-primary-data:/bitnami/postgresql
+    restart: unless-stopped
+    mem_limit: 512m
+    cpus: 1.00
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U rts_user -d rts_db"]
       interval: 5s
@@ -62,6 +65,7 @@ services:
       retries: 5
 
   postgres-replica:
+    profiles: ["ha"]
     image: bitnami/postgresql:15
     container_name: rts-postgres-replica
     depends_on:
@@ -80,6 +84,7 @@ services:
       - postgres-replica-data:/bitnami/postgresql
 
   pgpool:
+    profiles: ["ha"]
     image: bitnami/pgpool:4
     container_name: rts-pgpool
     depends_on:
@@ -109,6 +114,9 @@ services:
     image: redis:7
     container_name: rts-redis
     command: ["redis-server", "--appendonly", "yes"]
+    restart: unless-stopped
+    mem_limit: 128m
+    cpus: 0.50
     ports:
       - "6379:6379"
     volumes:
@@ -122,6 +130,9 @@ services:
   nginx:
     image: nginx:1.27
     container_name: rts-nginx
+    restart: unless-stopped
+    mem_limit: 64m
+    cpus: 0.25
     depends_on:
       certs:
         condition: service_completed_successfully
@@ -134,6 +145,7 @@ services:
       - ./nginx/certs:/etc/nginx/certs:ro
 
   prometheus:
+    profiles: ["observability"]
     image: prom/prometheus:v2.53.1
     container_name: rts-prometheus
     volumes:
@@ -142,6 +154,7 @@ services:
       - "9090:9090"
 
   postgres-exporter:
+    profiles: ["observability"]
     image: prometheuscommunity/postgres-exporter:v0.15.0
     container_name: rts-postgres-exporter
     environment:
@@ -153,6 +166,7 @@ services:
       - "9187:9187"
 
   grafana:
+    profiles: ["observability"]
     image: grafana/grafana-oss:11.1.0
     container_name: rts-grafana
     environment:
@@ -164,8 +178,6 @@ services:
       - grafana-data:/var/lib/grafana
 
 volumes:
-  go-mod-cache:
-  go-build-cache:
   postgres-primary-data:
   postgres-replica-data:
   redis-data:

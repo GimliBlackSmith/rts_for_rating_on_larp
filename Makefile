@@ -1,16 +1,22 @@
 SHELL := /bin/bash
 COMPOSE := docker compose
 
-.PHONY: help build up down restart logs ps sh gore air psql redis-cli clean
+.PHONY: help build up up-ha up-observability down restart logs ps sh psql redis-cli clean
 
 help: ## Show available commands
 	@grep -E '^[a-zA-Z_-]+:.*?##' Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'
 
-build: ## Build the development images
+build: ## Build images
 	$(COMPOSE) build
 
 up: ## Start the full local stack in the background
 	$(COMPOSE) up -d
+
+up-ha: ## Start stack with HA services (pgpool + replica)
+	$(COMPOSE) --profile ha up -d
+
+up-observability: ## Start stack with Prometheus/Grafana/exporter
+	$(COMPOSE) --profile observability up -d
 
 restart: down up ## Restart the stack
 
@@ -28,12 +34,6 @@ psql: ## Open a psql session inside the Postgres primary container
 
 redis-cli: ## Open a redis-cli session
 	$(COMPOSE) exec redis redis-cli
-
-gore: ## Launch gore REPL inside the application container
-	$(COMPOSE) run --rm app gore
-
-air: ## Run the application with Air in the foreground
-	$(COMPOSE) run --rm --service-ports app air -c .air.toml
 
 down: ## Stop and remove containers, networks, and anonymous volumes
 	$(COMPOSE) down --remove-orphans
