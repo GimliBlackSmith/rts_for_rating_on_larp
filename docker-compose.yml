@@ -136,7 +136,8 @@ services:
     depends_on:
       certs:
         condition: service_completed_successfully
-      - app
+      app:
+        condition: service_started
     ports:
       - "8443:443"
       - "8081:80"
