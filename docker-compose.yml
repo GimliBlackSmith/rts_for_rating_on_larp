@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   certs:
     image: alpine:3.20
@@ -42,19 +40,16 @@ services:
         condition: service_healthy
 
   postgres-primary:
-    image: bitnami/postgresql:15
+    image: postgres:15
     container_name: rts-postgres-primary
     environment:
-      POSTGRESQL_USERNAME: rts_user
-      POSTGRESQL_PASSWORD: rts_password
-      POSTGRESQL_DATABASE: rts_db
-      POSTGRESQL_REPLICATION_MODE: master
-      POSTGRESQL_REPLICATION_USER: rts_repl
-      POSTGRESQL_REPLICATION_PASSWORD: rts_repl_password
+      POSTGRES_USER: rts_user
+      POSTGRES_PASSWORD: rts_password
+      POSTGRES_DB: rts_db
     ports:
       - "5432:5432"
     volumes:
-      - postgres-primary-data:/bitnami/postgresql
+      - postgres-primary-data:/var/lib/postgresql/data
     restart: unless-stopped
     mem_limit: 512m
     cpus: 1.00
@@ -66,22 +61,19 @@ services:
 
   postgres-replica:
     profiles: ["ha"]
-    image: bitnami/postgresql:15
+    image: postgres:15
     container_name: rts-postgres-replica
     depends_on:
       postgres-primary:
         condition: service_healthy
     environment:
-      POSTGRESQL_REPLICATION_MODE: slave
-      POSTGRESQL_REPLICATION_USER: rts_repl
-      POSTGRESQL_REPLICATION_PASSWORD: rts_repl_password
-      POSTGRESQL_MASTER_HOST: postgres-primary
-      POSTGRESQL_MASTER_PORT_NUMBER: "5432"
-      POSTGRESQL_PASSWORD: rts_password
+      POSTGRES_USER: rts_user
+      POSTGRES_PASSWORD: rts_password
+      POSTGRES_DB: rts_db
     ports:
       - "5433:5432"
     volumes:
-      - postgres-replica-data:/bitnami/postgresql
+      - postgres-replica-data:/var/lib/postgresql/data
 
   pgpool:
     profiles: ["ha"]
@@ -94,8 +86,8 @@ services:
         condition: service_started
     environment:
       PGPOOL_BACKEND_NODES: "0:postgres-primary:5432,1:postgres-replica:5432"
-      PGPOOL_SR_CHECK_USER: rts_repl
-      PGPOOL_SR_CHECK_PASSWORD: rts_repl_password
+      PGPOOL_SR_CHECK_USER: rts_user
+      PGPOOL_SR_CHECK_PASSWORD: rts_password
       PGPOOL_POSTGRES_USERNAME: rts_user
       PGPOOL_POSTGRES_PASSWORD: rts_password
       PGPOOL_ADMIN_USERNAME: rts_admin
