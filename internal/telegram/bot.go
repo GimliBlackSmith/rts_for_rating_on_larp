@@ -45,6 +45,36 @@ func (b *Bot) WebhookHandler() http.HandlerFunc {
 			return
 		}
 
+		var (
+			messageID int
+			chatID    int64
+			fromID    int64
+			command   string
+		)
+		if update.Message != nil {
+			messageID = update.Message.MessageID
+			chatID = update.Message.Chat.ID
+			if update.Message.From != nil {
+				fromID = update.Message.From.ID
+			}
+			command = update.Message.Command()
+		}
+		if update.CallbackQuery != nil {
+			if update.CallbackQuery.From != nil {
+				fromID = update.CallbackQuery.From.ID
+			}
+			command = "callback"
+		}
+		b.log.Info("update received",
+			"update_id", update.UpdateID,
+			"message_id", messageID,
+			"chat_id", chatID,
+			"from_id", fromID,
+			"command", command,
+			"has_message", update.Message != nil,
+			"has_callback", update.CallbackQuery != nil,
+		)
+
 		ctx := r.Context()
 		switch {
 		case update.Message != nil:
@@ -62,35 +92,50 @@ func (b *Bot) WebhookHandler() http.HandlerFunc {
 
 func (b *Bot) handleMessage(ctx context.Context, message *tgbotapi.Message) error {
 	if !message.IsCommand() {
+		b.log.Info("non-command message ignored", "chat_id", message.Chat.ID, "message_id", message.MessageID)
 		return nil
 	}
 
-	switch message.Command() {
-	case "start":
-		return b.handleStart(ctx, message)
-	case "register":
-		return b.handleRegister(ctx, message)
-	case "my_link":
-		return b.handleMyLink(ctx, message)
-	case "add_player":
-		return b.handleAddPlayer(ctx, message)
-	case "set_cycle_duration":
-		return b.handleSetCycleDuration(ctx, message)
-	case "set_rating_timeout":
-		return b.handleSetRatingTimeout(ctx, message)
-	case "set_rating_limits":
-		return b.handleSetRatingLimits(ctx, message)
-	case "set_level_boundary":
-		return b.handleSetLevelBoundary(ctx, message)
-	case "apply_level_recalc":
-		return b.handleApplyLevelRecalc(ctx, message)
-	case "create_admin":
-		return b.handleCreateAdmin(ctx, message)
-	case "transfer":
-		return b.handleTransfer(ctx, message)
-	default:
-		return b.reply(message.Chat.ID, "Неизвестная команда.")
+	command := message.Command()
+	var fromID int64
+	if message.From != nil {
+		fromID = message.From.ID
 	}
+	b.log.Info("command received", "command", command, "chat_id", message.Chat.ID, "from_id", fromID, "message_id", message.MessageID)
+
+	var err error
+	switch command {
+	case "start":
+		err = b.handleStart(ctx, message)
+	case "register":
+		err = b.handleRegister(ctx, message)
+	case "my_link":
+		err = b.handleMyLink(ctx, message)
+	case "add_player":
+		err = b.handleAddPlayer(ctx, message)
+	case "set_cycle_duration":
+		err = b.handleSetCycleDuration(ctx, message)
+	case "set_rating_timeout":
+		err = b.handleSetRatingTimeout(ctx, message)
+	case "set_rating_limits":
+		err = b.handleSetRatingLimits(ctx, message)
+	case "set_level_boundary":
+		err = b.handleSetLevelBoundary(ctx, message)
+	case "apply_level_recalc":
+		err = b.handleApplyLevelRecalc(ctx, message)
+	case "create_admin":
+		err = b.handleCreateAdmin(ctx, message)
+	case "transfer":
+		err = b.handleTransfer(ctx, message)
+	default:
+		err = b.reply(message.Chat.ID, "Неизвестная команда.")
+	}
+	if err != nil {
+		b.log.Error("command failed", "command", command, "chat_id", message.Chat.ID, "from_id", fromID, "error", err)
+		return err
+	}
+	b.log.Info("command handled", "command", command, "chat_id", message.Chat.ID, "from_id", fromID)
+	return nil
 }
 
 func (b *Bot) handleCallback(ctx context.Context, callback *tgbotapi.CallbackQuery) error {
@@ -510,12 +555,22 @@ func (b *Bot) requireAdmin(ctx context.Context, telegramID int64, chatID int64) 
 func (b *Bot) reply(chatID int64, text string) error {
 	msg := tgbotapi.NewMessage(chatID, text)
 	_, err := b.api.Send(msg)
+	if err != nil {
+		b.log.Error("send message failed", "chat_id", chatID, "error", err)
+		return err
+	}
+	b.log.Info("message sent", "chat_id", chatID, "text_len", len(text))
 	return err
 }
 
 func (b *Bot) answerCallback(callbackID, text string) error {
 	response := tgbotapi.NewCallback(callbackID, text)
 	_, err := b.api.Request(response)
+	if err != nil {
+		b.log.Error("answer callback failed", "callback_id", callbackID, "error", err)
+		return err
+	}
+	b.log.Info("callback answered", "callback_id", callbackID, "text_len", len(text))
 	return err
 }
 

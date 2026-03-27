@@ -28,7 +28,7 @@ optional via Compose profiles.
 
 ### Environment details
 
-- Application container exposes port `8080` (internal) and is proxied via Nginx with TLS on `https://localhost:8443`.
+- Application container exposes port `8080` (internal) and is proxied via Nginx with TLS on `https://localhost:443`.
 - Postgres primary is available on `localhost:5432`.
 - Replica (`localhost:5433`) and Pgpool (`localhost:5434`) are available only with `ha` profile.
 - Postgres credentials: `rts_user` / `rts_password`, database `rts_db`.
@@ -98,8 +98,8 @@ Grafana is available for dashboards.
    - Observability profile: `make up-observability`
 
 5. **Verify service health**
-   - Webhook endpoint (behind TLS): `https://localhost:8443/healthz`
-   - Admin UI: `https://localhost:8443/admin?token=ADMIN_TOKEN`
+   - Webhook endpoint (behind TLS): `https://localhost:443/healthz`
+   - Admin UI: `https://localhost:443/admin?token=ADMIN_TOKEN`
    - Metrics/Grafana endpoints are available when running with `observability` profile.
 
 6. **Register Telegram webhook**
@@ -139,9 +139,7 @@ Adjust environment variables or ports in `docker-compose.yml` as needed for your
    ADMIN_TOKEN=сложный_секрет_для_admin
    WEBHOOK_URL=https://bot.example.com  # без /webhook
    ```
-3. Для production поменяйте в `docker-compose.yml` у `nginx`:
-   - было: `8443:443`
-   - стало: `443:443`
+3. Убедитесь, что в `docker-compose.yml` у `nginx` внешний TLS-порт задан как `443:443`.
 4. Запустите сервис:
    ```bash
    make build
@@ -221,8 +219,7 @@ Adjust environment variables or ports in `docker-compose.yml` as needed for your
    - `80/tcp` (для certbot renew hook/редиректов)
    - `443/tcp` (входящий webhook от Telegram)
 
-   В текущем compose внешний TLS-порт проброшен как `8443:443`.
-   Для production лучше заменить на `443:443` в `docker-compose.yml`.
+   В текущем compose внешний TLS-порт проброшен как `443:443`.
 
 6. **Запустите стек**
    ```bash
