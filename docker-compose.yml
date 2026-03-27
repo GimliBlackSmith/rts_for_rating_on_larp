@@ -23,7 +23,7 @@ services:
       GO_ENV: production
       DATABASE_URL: postgres://rts_user:rts_password@postgres-primary:5432/rts_db?sslmode=disable
       REDIS_URL: redis://redis:6379/0
-      WEBHOOK_URL: https://localhost:8443
+      WEBHOOK_URL: ${WEBHOOK_URL:-}
       TELEGRAM_TOKEN: ${TELEGRAM_TOKEN:-}
       WEBHOOK_CERT: /etc/nginx/certs/server.crt
       ADMIN_TOKEN: ${ADMIN_TOKEN:-}

@@ -71,7 +71,7 @@ Grafana is available for dashboards.
      ADMIN_TOKEN=your_admin_token
      ```
    - Optional overrides (only if you need to customize):
-     - `WEBHOOK_URL` (default in compose is `https://localhost:8443`)
+     - `WEBHOOK_URL` (empty by default; set this to your public HTTPS domain for Telegram webhook registration)
      - `SERVER_ADDR` (default `:8080`)
 
 2. **Provision TLS certificate**
@@ -104,7 +104,7 @@ Grafana is available for dashboards.
 
 6. **Register Telegram webhook**
    - Ensure your public DNS/TLS is set and reachable by Telegram.
-   - Set `WEBHOOK_URL=https://your-domain` in `.env`.
+   - Set `WEBHOOK_URL=https://your-domain` in `.env` (**without** `/webhook`; path is controlled by `WEBHOOK_PATH`, default `/webhook`).
    - Restart the app container:
      ```bash
      docker compose restart app
@@ -137,7 +137,7 @@ Adjust environment variables or ports in `docker-compose.yml` as needed for your
    ```bash
    TELEGRAM_TOKEN=ваш_токен_бота
    ADMIN_TOKEN=сложный_секрет_для_admin
-   WEBHOOK_URL=https://bot.example.com
+   WEBHOOK_URL=https://bot.example.com  # без /webhook
    ```
 3. Для production поменяйте в `docker-compose.yml` у `nginx`:
    - было: `8443:443`
@@ -196,7 +196,7 @@ Adjust environment variables or ports in `docker-compose.yml` as needed for your
    cat > .env <<'EOF'
    TELEGRAM_TOKEN=ваш_токен_бота
    ADMIN_TOKEN=сложный_секрет_для_admin
-   WEBHOOK_URL=https://bot.example.com
+   WEBHOOK_URL=https://bot.example.com  # без /webhook
    EOF
    ```
 
