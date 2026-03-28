@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -59,7 +61,7 @@ func main() {
 	}
 
 	if cfg.WebhookURL != "" {
-		webhookURL := cfg.WebhookURL + cfg.WebhookPath
+		webhookURL := buildWebhookURL(cfg.WebhookURL, cfg.WebhookPath)
 		var webhook tgbotapi.WebhookConfig
 		if cfg.WebhookCert != "" {
 			webhook, err = tgbotapi.NewWebhookWithCert(webhookURL, tgbotapi.FilePath(cfg.WebhookCert))
@@ -75,6 +77,18 @@ func main() {
 			os.Exit(1)
 		}
 		logger.Info("webhook configured", "url", webhookURL)
+
+		if webhookInfo, err := botAPI.GetWebhookInfo(); err != nil {
+			logger.Error("get webhook info", "error", err)
+		} else {
+			logger.Info("telegram webhook info",
+				"url", webhookInfo.URL,
+				"pending_updates", webhookInfo.PendingUpdateCount,
+				"last_error_date", webhookInfo.LastErrorDate,
+				"last_error_message", webhookInfo.LastErrorMessage,
+				"max_connections", webhookInfo.MaxConnections,
+			)
+		}
 	}
 
 	bot := telegram.New(botAPI, store, logger)
@@ -111,4 +125,16 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	_ = server.Shutdown(shutdownCtx)
+}
+
+func buildWebhookURL(baseURL, path string) string {
+	base := strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	webhookPath := strings.TrimSpace(path)
+	if webhookPath == "" || webhookPath == "/" {
+		return base
+	}
+	if !strings.HasPrefix(webhookPath, "/") {
+		webhookPath = "/" + webhookPath
+	}
+	return fmt.Sprintf("%s%s", base, webhookPath)
 }
