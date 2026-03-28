@@ -25,7 +25,7 @@ services:
       REDIS_URL: redis://redis:6379/0
       WEBHOOK_URL: ${WEBHOOK_URL:-}
       TELEGRAM_TOKEN: ${TELEGRAM_TOKEN:-}
-      WEBHOOK_CERT: /etc/nginx/certs/server.crt
+      WEBHOOK_CERT: ${WEBHOOK_CERT:-}
       ADMIN_TOKEN: ${ADMIN_TOKEN:-}
     mem_limit: 256m
     cpus: 0.50

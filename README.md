@@ -72,6 +72,7 @@ Grafana is available for dashboards.
      ```
    - Optional overrides (only if you need to customize):
      - `WEBHOOK_URL` (empty by default; set this to your public HTTPS domain for Telegram webhook registration)
+     - `WEBHOOK_CERT` (empty by default; set only for self-signed certs so the bot uploads the public cert to Telegram)
      - `SERVER_ADDR` (default `:8080`)
 
 2. **Provision TLS certificate**
