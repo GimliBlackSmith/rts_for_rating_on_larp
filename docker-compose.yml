@@ -21,7 +21,7 @@ services:
       - ./nginx/certs:/etc/nginx/certs:ro
     environment:
       GO_ENV: production
-      DATABASE_URL: postgres://rts_user:rts_password@postgres-primary:5432/rts_db?sslmode=disable
+      DATABASE_URL: postgres://${POSTGRES_USER:-rts_user}:${POSTGRES_PASSWORD:-rts_password}@postgres-primary:5432/${POSTGRES_DB:-rts_db}?sslmode=disable
       REDIS_URL: redis://redis:6379/0
       WEBHOOK_URL: ${WEBHOOK_URL:-}
       TELEGRAM_TOKEN: ${TELEGRAM_TOKEN:-}
@@ -29,8 +29,9 @@ services:
       ADMIN_TOKEN: ${ADMIN_TOKEN:-}
     mem_limit: 256m
     cpus: 0.50
-    ports:
-      - "8080:8080"
+    networks:
+      - frontend
+      - backend
     depends_on:
       certs:
         condition: service_completed_successfully
@@ -43,11 +44,9 @@ services:
     image: postgres:15
     container_name: rts-postgres-primary
     environment:
-      POSTGRES_USER: rts_user
-      POSTGRES_PASSWORD: rts_password
-      POSTGRES_DB: rts_db
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER:-rts_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rts_password}
+      POSTGRES_DB: ${POSTGRES_DB:-rts_db}
     volumes:
       - postgres-primary-data:/var/lib/postgresql/data
     restart: unless-stopped
@@ -58,6 +57,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - backend
 
   postgres-replica:
     profiles: ["ha"]
@@ -67,13 +68,13 @@ services:
       postgres-primary:
         condition: service_healthy
     environment:
-      POSTGRES_USER: rts_user
-      POSTGRES_PASSWORD: rts_password
-      POSTGRES_DB: rts_db
-    ports:
-      - "5433:5432"
+      POSTGRES_USER: ${POSTGRES_USER:-rts_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rts_password}
+      POSTGRES_DB: ${POSTGRES_DB:-rts_db}
     volumes:
       - postgres-replica-data:/var/lib/postgresql/data
+    networks:
+      - backend
 
   pgpool:
     profiles: ["ha"]
@@ -86,21 +87,21 @@ services:
         condition: service_started
     environment:
       PGPOOL_BACKEND_NODES: "0:postgres-primary:5432,1:postgres-replica:5432"
-      PGPOOL_SR_CHECK_USER: rts_user
-      PGPOOL_SR_CHECK_PASSWORD: rts_password
-      PGPOOL_POSTGRES_USERNAME: rts_user
-      PGPOOL_POSTGRES_PASSWORD: rts_password
-      PGPOOL_ADMIN_USERNAME: rts_admin
-      PGPOOL_ADMIN_PASSWORD: rts_admin_password
+      PGPOOL_SR_CHECK_USER: ${POSTGRES_USER:-rts_user}
+      PGPOOL_SR_CHECK_PASSWORD: ${POSTGRES_PASSWORD:-rts_password}
+      PGPOOL_POSTGRES_USERNAME: ${POSTGRES_USER:-rts_user}
+      PGPOOL_POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rts_password}
+      PGPOOL_ADMIN_USERNAME: ${PGPOOL_ADMIN_USERNAME:-rts_admin}
+      PGPOOL_ADMIN_PASSWORD: ${PGPOOL_ADMIN_PASSWORD:-rts_admin_password}
       PGPOOL_ENABLE_LOAD_BALANCING: "yes"
       PGPOOL_ENABLE_STATEMENT_LOAD_BALANCING: "no"
-    ports:
-      - "5434:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U rts_user -d rts_db"]
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - backend
 
   redis:
     image: redis:7
@@ -109,8 +110,6 @@ services:
     restart: unless-stopped
     mem_limit: 128m
     cpus: 0.50
-    ports:
-      - "6379:6379"
     volumes:
       - redis-data:/data
     healthcheck:
@@ -118,6 +117,8 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    networks:
+      - backend
 
   nginx:
     image: nginx:1.27
@@ -132,10 +133,12 @@ services:
         condition: service_started
     ports:
       - "443:443"
-      - "8081:80"
     volumes:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./nginx/certs:/etc/nginx/certs:ro
+    networks:
+      - frontend
+      - backend
 
   prometheus:
     profiles: ["observability"]
@@ -143,20 +146,20 @@ services:
     container_name: rts-prometheus
     volumes:
       - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-    ports:
-      - "9090:9090"
+    networks:
+      - backend
 
   postgres-exporter:
     profiles: ["observability"]
     image: prometheuscommunity/postgres-exporter:v0.15.0
     container_name: rts-postgres-exporter
     environment:
-      DATA_SOURCE_NAME: postgres://rts_user:rts_password@postgres-primary:5432/rts_db?sslmode=disable
+      DATA_SOURCE_NAME: postgres://${POSTGRES_USER:-rts_user}:${POSTGRES_PASSWORD:-rts_password}@postgres-primary:5432/${POSTGRES_DB:-rts_db}?sslmode=disable
     depends_on:
       postgres-primary:
         condition: service_healthy
-    ports:
-      - "9187:9187"
+    networks:
+      - backend
 
   grafana:
     profiles: ["observability"]
@@ -165,13 +168,20 @@ services:
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
-    ports:
-      - "3000:3000"
     volumes:
       - grafana-data:/var/lib/grafana
+    networks:
+      - backend
 
 volumes:
   postgres-primary-data:
   postgres-replica-data:
   redis-data:
   grafana-data:
+
+networks:
+  frontend:
+    driver: bridge
+  backend:
+    driver: bridge
+    internal: true
