@@ -16,6 +16,7 @@ type Config struct {
 	MigrateOnStart bool
 	ConfigCacheTTL time.Duration
 	AdminToken     string
+	BotLinkBase    string
 }
 
 func Load() Config {
@@ -29,6 +30,7 @@ func Load() Config {
 		MigrateOnStart: getEnvBool("MIGRATE_ON_START", true),
 		ConfigCacheTTL: getEnvDuration("CONFIG_CACHE_TTL", 30*time.Second),
 		AdminToken:     getEnv("ADMIN_TOKEN", ""),
+		BotLinkBase:    getEnv("BOT_LINK_BASE", "https://t.me/novy_rim_bot"),
 	}
 }
 
