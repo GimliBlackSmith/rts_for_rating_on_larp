@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"math"
 	"net/http"
@@ -27,19 +28,37 @@ const (
 )
 
 type Bot struct {
-	api   *tgbotapi.BotAPI
-	store *db.Store
-	log   *slog.Logger
+	api         *tgbotapi.BotAPI
+	store       *db.Store
+	log         *slog.Logger
+	botLinkBase string
 }
 
-func New(api *tgbotapi.BotAPI, store *db.Store, log *slog.Logger) *Bot {
-	return &Bot{api: api, store: store, log: log}
+func New(api *tgbotapi.BotAPI, store *db.Store, log *slog.Logger, botLinkBase string) *Bot {
+	botLinkBase = strings.TrimSpace(botLinkBase)
+	if botLinkBase == "" {
+		botLinkBase = "https://t.me/novy_rim_bot"
+	}
+	return &Bot{api: api, store: store, log: log, botLinkBase: strings.TrimRight(botLinkBase, "/")}
 }
 
 func (b *Bot) WebhookHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			b.log.Info("webhook non-post request", "method", r.Method, "path", r.URL.Path)
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		defer r.Body.Close()
+
 		var update tgbotapi.Update
 		if err := json.NewDecoder(r.Body).Decode(&update); err != nil {
+			if errors.Is(err, io.EOF) {
+				b.log.Info("empty webhook payload", "path", r.URL.Path)
+				w.WriteHeader(http.StatusOK)
+				return
+			}
 			b.log.Error("decode update", "error", err)
 			w.WriteHeader(http.StatusBadRequest)
 			return
@@ -237,7 +256,7 @@ func (b *Bot) handleMyLink(ctx context.Context, message *tgbotapi.Message) error
 			return b.reply(message.Chat.ID, "Не удалось создать ссылку.")
 		}
 	}
-	link := fmt.Sprintf("https://t.me/novy_rim_bot?start=player_%s", linkHash)
+	link := b.buildPlayerLink(linkHash)
 	qrPNG, err := qrcode.Encode(link, qrcode.Medium, 256)
 	if err != nil {
 		return b.reply(message.Chat.ID, fmt.Sprintf("Ваша ссылка: %s", link))
@@ -246,6 +265,10 @@ func (b *Bot) handleMyLink(ctx context.Context, message *tgbotapi.Message) error
 	photo.Caption = fmt.Sprintf("Ваша ссылка: %s", link)
 	_, err = b.api.Send(photo)
 	return err
+}
+
+func (b *Bot) buildPlayerLink(linkHash string) string {
+	return fmt.Sprintf("%s?start=player_%s", b.botLinkBase, linkHash)
 }
 
 func (b *Bot) handleAddPlayer(ctx context.Context, message *tgbotapi.Message) error {
@@ -269,7 +292,7 @@ func (b *Bot) handleAddPlayer(ctx context.Context, message *tgbotapi.Message) er
 	if err != nil {
 		return b.reply(message.Chat.ID, "Игрок создан, но ссылка не сгенерирована.")
 	}
-	return b.reply(message.Chat.ID, fmt.Sprintf("Игрок создан. Ссылка: https://t.me/novy_rim_bot?start=player_%s", linkHash))
+	return b.reply(message.Chat.ID, fmt.Sprintf("Игрок создан. Ссылка: %s", b.buildPlayerLink(linkHash)))
 }
 
 func (b *Bot) handleSetCycleDuration(ctx context.Context, message *tgbotapi.Message) error {
@@ -382,13 +405,32 @@ func (b *Bot) handleApplyLevelRecalc(ctx context.Context, message *tgbotapi.Mess
 }
 
 func (b *Bot) handleCreateAdmin(ctx context.Context, message *tgbotapi.Message) error {
-	if err := b.requireAdmin(ctx, message.From.ID, message.Chat.ID); err != nil {
-		return err
+	hasAnyAdmin, err := b.store.HasAnyAdmin(ctx)
+	if err != nil {
+		return b.reply(message.Chat.ID, "Не удалось проверить список администраторов.")
 	}
+
+	if hasAnyAdmin {
+		if err := b.requireAdmin(ctx, message.From.ID, message.Chat.ID); err != nil {
+			return err
+		}
+	}
+
 	telegramID, err := strconv.ParseInt(strings.TrimSpace(message.CommandArguments()), 10, 64)
 	if err != nil {
 		return b.reply(message.Chat.ID, "Укажите корректный telegram_id.")
 	}
+
+	if !hasAnyAdmin {
+		if message.From == nil || telegramID != message.From.ID {
+			return b.reply(message.Chat.ID, "Первого администратора можно назначить только на себя: /create_admin <ваш_telegram_id>.")
+		}
+		if err := b.store.SetPlayerRole(ctx, telegramID, roleSuperAdmin); err != nil {
+			return b.reply(message.Chat.ID, "Не удалось назначить первого администратора. Сначала выполните /start.")
+		}
+		return b.reply(message.Chat.ID, "Вы назначены первым администратором (super_admin).")
+	}
+
 	if err := b.store.SetPlayerRole(ctx, telegramID, roleAdmin); err != nil {
 		return b.reply(message.Chat.ID, "Не удалось назначить администратора.")
 	}

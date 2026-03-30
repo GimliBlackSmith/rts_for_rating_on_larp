@@ -11,8 +11,8 @@ import (
 	"syscall"
 	"time"
 
-	"rts_for_rating_on_larp/internal/config"
 	"rts_for_rating_on_larp/internal/admin"
+	"rts_for_rating_on_larp/internal/config"
 	"rts_for_rating_on_larp/internal/db"
 	"rts_for_rating_on_larp/internal/telegram"
 
@@ -91,7 +91,7 @@ func main() {
 		}
 	}
 
-	bot := telegram.New(botAPI, store, logger)
+	bot := telegram.New(botAPI, store, logger, cfg.BotLinkBase)
 	adminHandler, err := admin.New(store, cfg.AdminToken)
 	if err != nil {
 		logger.Error("init admin handler", "error", err)

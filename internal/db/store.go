@@ -28,18 +28,18 @@ type Player struct {
 }
 
 type SystemConfig struct {
-	RatingFormulaA           float64
-	RatingFormulaB           float64
-	DefaultCycleDuration     int
-	DefaultRatingTimeout     int
+	RatingFormulaA       float64
+	RatingFormulaB       float64
+	DefaultCycleDuration int
+	DefaultRatingTimeout int
 }
 
 type GameCycle struct {
-	ID                  int
-	CycleNumber         int
-	StartTime           time.Time
-	EndTime             time.Time
-	DurationMinutes     int
+	ID                   int
+	CycleNumber          int
+	StartTime            time.Time
+	EndTime              time.Time
+	DurationMinutes      int
 	RatingTimeoutMinutes int
 }
 
@@ -477,6 +477,19 @@ func (s *Store) LogOperation(ctx context.Context, operationType string, initiato
 		VALUES ($1, $2, $3, $4)
 	`, operationType, initiatorID, targetID, details)
 	return err
+}
+
+func (s *Store) HasAnyAdmin(ctx context.Context) (bool, error) {
+	var count int
+	row := s.pool.QueryRow(ctx, `
+		SELECT COUNT(1)
+		FROM players
+		WHERE role IN ('moderator', 'admin', 'super_admin')
+	`)
+	if err := row.Scan(&count); err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
 
 func (s *Store) IsAdmin(ctx context.Context, telegramID int64) (bool, error) {
